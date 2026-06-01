@@ -12,11 +12,26 @@ class OpenAPISpec(ABC):
             resp.raise_for_status()
             self.raw_openapi_spec = resp.text
             self.openapi_spec = resp.json()
+            self.version = self.openapi_spec.get("info", {}).get("version", "0.0.0")
+            self.cookie_auth = extract_cookie_auth_scheme(self.openapi_spec)
             self.tools_cache = extract_tools_from_openapi(self.openapi_spec)
             logger.info(f"Loaded OpenAPI spec and cached {len(self.tools_cache)} tools")
         except Exception as e:
             logger.error(f"Failed to load OpenAPI spec: {e}")
             raise
+
+
+def extract_cookie_auth_scheme(spec: Dict[str, Any]) -> Dict[str, Any] | None:
+    """Return the first cookie-based security scheme declared by the OpenAPI
+    spec (``type: apiKey``, ``in: cookie``), or ``None`` if the API declares no
+    cookie auth. Lets the discovery doc advertise cookie auth only when the
+    underlying API actually supports it, using the cookie name from the spec.
+    """
+    schemes = spec.get("components", {}).get("securitySchemes", {})
+    for scheme in schemes.values():
+        if scheme.get("type") == "apiKey" and scheme.get("in") == "cookie":
+            return scheme
+    return None
 
 
 def resolve_schema_ref(spec: Dict[str, Any], ref: str) -> Dict[str, Any]:
@@ -103,11 +118,28 @@ def extract_response_info(spec: Dict[str, Any], operation: Dict[str, Any]) -> Di
     return response_info
 
 
+def operation_requires_auth(spec: Dict[str, Any], operation: Dict[str, Any]) -> bool:
+    """Determine whether an operation requires authentication.
+
+    Per the OpenAPI spec, an operation-level ``security`` field overrides the
+    top-level ``security`` field. An empty list (``security: []``) explicitly
+    disables authentication for that scope. A non-empty list means at least one
+    security requirement must be satisfied.
+    """
+    op_security = operation.get("security")
+    if op_security is not None:
+        # Operation-level security overrides the global default.
+        return len(op_security) > 0
+
+    # Fall back to the global security requirements.
+    return len(spec.get("security", [])) > 0
+
+
 def extract_tools_from_openapi(spec: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
     """Extract tools from OpenAPI spec with enhanced parameter and response documentation"""
     tools = {}
     paths = spec.get("paths", {})
-    
+
     for path, methods in paths.items():
         for method, operation in methods.items():
             method_upper = method.upper()
@@ -204,13 +236,14 @@ def extract_tools_from_openapi(spec: Dict[str, Any]) -> Dict[str, Dict[str, Any]
                     "properties": props,
                     "required": required_params,
                 },
-                "responses": response_info
+                "responses": response_info,
+                "requires_auth": operation_requires_auth(spec, operation),
             }
-            
+
             # Add tags if available
             if "tags" in operation:
                 tool_info["tags"] = operation["tags"]
-            
+
             # Add security requirements if available
             if "security" in operation:
                 tool_info["security"] = operation["security"]

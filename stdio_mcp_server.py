@@ -9,10 +9,10 @@ from util.log import logger
 from util.vars import MCP_SERVER_NAME, OPENAPI_SPEC_URL, AUTH_HEADER, API_BASE_URL
 
 
-# Create MCP server
-server = Server(MCP_SERVER_NAME)
-
 openapi_spec = OpenAPISpec()
+
+# Create MCP server
+server = Server(MCP_SERVER_NAME, version=openapi_spec.version)
 logger.info("Loaded openapi spec")
 
 @server.list_tools()
@@ -25,7 +25,8 @@ async def list_tools() -> list[Tool]:
         tools.append(Tool(
             name=tool_name,
             description=tool_info["description"],
-            inputSchema=tool_info["inputSchema"]
+            inputSchema=tool_info["inputSchema"],
+            _meta={"requiresAuth": tool_info.get("requires_auth", False)},
         ))
         logger.info(f"Added {tool_name}")
     

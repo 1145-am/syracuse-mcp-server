@@ -62,19 +62,31 @@ You don't need to update your key in the `.env` file, but you do need to:
 
 1. Clone this repo
 2. Copy `.env.sample` to `.env` - though any further configuration is not needed
-3. Run it with `uv run http_mcp_server.py`
+3. Run it with `uv run stateless_streaming_http_mcp_server.py`
 
-The Stateless Streaming MCP Server also serves an mcp.json at `.well-known/mcp.json` (in this example it would be `http://127.0.0.1:9000/.well-known/mcp.json` )
-By default you'll need to connect to `http://127.0.0.1:9000/mcp`
+Connection info for MCP Inspector:
+- **Transport Type**: Streamable HTTP
+- **URL**: host:port/mcp, e.g. `http://127.0.0.1:9000/mcp`
+- Anyone making calls that require authorization will need to add their API key in the Authentication section
+
+The Stateless Streaming MCP Server also serves an mcp.json at `.well-known/mcp.json` (in this example it would be `http://127.0.0.1/.well-known/mcp.json` )
 
 ## Allowed tools
 
 By default the ALLOWED_TOOLS restricts the MCP server to the minimum needed to register accounts and get stories:
 - register_and_get_key 
 - location_groups_list
-- stories
+- stories_industry_location_list
+- stories_organization_list
 
-There's no problem to allow all tools - if you'd like to experiment simply remove ALLOWED_TOOLS.
+There's no problem to allow all tools - if you'd like to experiment simply remove ALLOWED_TOOLS from `.env`
 
+## Distinguishing tools that need auth
 
+Each tool is tagged with whether it requires authentication, derived from the OpenAPI `security` rules (an operation's `security` overrides the spec-level `security`, and an explicit empty `security: []` means no auth). This is exposed two ways:
+
+- In `tools/list`, each tool carries `_meta: { "requiresAuth": true | false }`.
+- In `.well-known/mcp.json`, the same `_meta` flag is present, and the `security` block is only attached to tools that actually require auth.
+
+Clients can use this to call public endpoints without prompting the user for a token, and only request credentials for tools that need them.
 
