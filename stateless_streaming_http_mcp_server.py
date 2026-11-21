@@ -14,13 +14,13 @@ from starlette.responses import JSONResponse
 from starlette.types import Receive, Scope, Send
 from starlette.requests import Request
 import requests 
-import json
 import uvicorn
 
 from util.vars import (API_BASE_URL, API_TOKEN_PREFIX, AUTH_HEADER_NAME,
                        OPENAPI_SPEC_URL, MCP_SERVER_NAME, HTTP_MCP_SERVER_PORT,
                        MCP_SERVER_DESCRIPTION)
-from util.shared import OpenAPISpec, describe_http_error
+from util.shared import OpenAPISpec
+from util.x402_relay import payment_headers, tool_result
 from util.log import logger
 
 def prepare_auth_headers(headers: Dict, extra_apikey_header_names: frozenset = frozenset()) -> Dict:
@@ -332,7 +332,7 @@ def main(
         ]
 
     @app.call_tool()
-    async def call_tool(tool_name: str, arguments: dict[str, Any]) -> list[types.ContentBlock]:
+    async def call_tool(tool_name: str, arguments: dict[str, Any]) -> list[types.ContentBlock] | types.CallToolResult:
         tool_data = openapi_spec.tools_cache[tool_name]
 
         endpoint = tool_data["endpoint"]
@@ -347,17 +347,19 @@ def main(
 
         url = API_BASE_URL.rstrip("/") + endpoint
 
-        request = app.request_context.request
+        request_context = app.request_context
         extra_apikey_header_names = frozenset(
             s.get("name", "")
             for s in openapi_spec.header_apikey_schemes.values()
             if s.get("name", "").lower() != AUTH_HEADER_NAME.lower()
         )
-        headers = prepare_auth_headers(request.headers, extra_apikey_header_names)
+        headers = prepare_auth_headers(request_context.request.headers, extra_apikey_header_names)
 
         logger.info(f"Making {tool_data['method']} request to {url}")
 
         try:
+            meta = request_context.meta.model_extra if request_context.meta else None
+            headers |= payment_headers(meta)
             if tool_data["method"].upper() == "GET":
                 resp = requests.get(url, params=params, headers=headers, timeout=30)
             elif tool_data["method"].upper() == "POST":
@@ -365,18 +367,9 @@ def main(
             else:
                 return [types.TextContent(type="text", text=f"Unsupported method: {tool_data['method']}")]
 
-            if not resp.ok:
-                error_msg = describe_http_error(tool_name, resp)
-                logger.error(error_msg)
-                return [types.TextContent(type="text", text=error_msg)]
-            try:
-                result_json = resp.json()
-                success_msg = f"Successfully called {tool_name}. Response: {json.dumps(result_json, indent=2)}"
-                logger.info(f"Tool '{tool_name}' executed successfully")
-                return [types.TextContent(type="text", text=success_msg)]
-            except json.JSONDecodeError:
-                logger.info(f"Tool '{tool_name}' returned non-JSON response")
-                return [types.TextContent(type="text", text=f"Response from {tool_name}: {resp.text}")]
+            result = tool_result(tool_name, resp)
+            logger.info(f"Tool '{tool_name}' returned HTTP {resp.status_code}")
+            return result
 
         except requests.exceptions.Timeout:
             error_msg = f"Request to {tool_name} timed out after 30 seconds"
