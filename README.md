@@ -13,6 +13,32 @@ Use the hosted endpoint at `https://syracuse.1145.am/mcp/`. You can pay with a f
 | `location_groups_list` | Valid location names and ids (UN regions, US Census regions, US states, and the states or provinces of some other countries) for the location filters. | No |
 | `register_and_get_key_create` | Creates an account for an email address and returns an API key. | No |
 
+### Example
+
+`stories_organization_list` with `org_name: "Microsoft"` returns stories like this (extract shortened):
+
+```json
+{
+  "count": 415,
+  "results": [
+    {
+      "activity_class": "IncidentActivity",
+      "label": "widespread outage across Outlook, Teams, and its Copilot AI assistant",
+      "headline": "Microsoft says latent July bug triggered global Microsoft 365 outage",
+      "document_extract": "Microsoft Corporation (NASDAQ: MSFT) disclosed that a latent software defect lurking in its data centers since July triggered last week's widespread outage across Outlook, Teams, and its Copilot AI assistant...",
+      "published_date": "2026-11-16T20:00:48Z",
+      "published_by": "Investing.com",
+      "document_url": "https://www.investing.com/news/stock-market-news/microsoft-says-latent-july-bug-triggered-global-microsoft-365-outage-5030785",
+      "matched_organizations": [
+        {"name": "Microsoft Corporation", "role": "organization", "uri": "https://1145.am/db/24398699/Microsoft_Corporation"}
+      ]
+    }
+  ]
+}
+```
+
+Each story has an event type (`activity_class`), a date, the source publication and a link to the original article. Results are paginated. Pass `output: "full"` for more detail.
+
 All tools carry MCP annotations (`readOnlyHint`, `idempotentHint` and so on). Each tool also carries `_meta.requiresAuth`, so a client knows which tools it can call without credentials.
 
 ## Connect to the hosted server
