@@ -1,5 +1,7 @@
 """Unit tests for the OpenAPI-spec parsing helpers in util.shared."""
 
+import types
+
 import pytest
 
 from util import shared
@@ -10,6 +12,7 @@ from util.shared import (
     operation_requires_auth,
     extract_tools_from_openapi,
     extract_header_apikey_schemes,
+    describe_http_error,
 )
 
 
@@ -167,6 +170,15 @@ class TestOperationRequiresAuth:
     def test_no_security_anywhere(self):
         assert operation_requires_auth({}, {}) is False
 
+    def test_empty_requirement_makes_auth_optional(self):
+        spec = {}
+        operation = {"security": [{"apiToken": []}, {}]}
+        assert operation_requires_auth(spec, operation) is False
+
+    def test_empty_global_requirement_makes_auth_optional(self):
+        spec = {"security": [{"apiToken": []}, {}]}
+        assert operation_requires_auth(spec, {}) is False
+
 
 # --------------------------------------------------------------------------- #
 # extract_tools_from_openapi
@@ -207,6 +219,12 @@ class TestExtractToolsFromOpenapi:
         )
         tools = extract_tools_from_openapi(spec)
         assert set(tools) == {"listPets"}
+
+    def test_allowlist_name_missing_from_spec_raises(self, monkeypatch):
+        monkeypatch.setattr(shared, "ALLOWED_TOOLS", ["listPets", "renamedTool"])
+        spec = _spec({"/pets": {"get": {"operationId": "listPets"}}})
+        with pytest.raises(ValueError, match="renamedTool"):
+            extract_tools_from_openapi(spec)
 
     def test_query_parameters_become_input_properties(self, no_allowlist):
         spec = _spec(
@@ -365,3 +383,16 @@ class TestExtractHeaderApiKeySchemes:
         )
         tool = extract_tools_from_openapi(spec)["listPets"]
         assert tool["description"] == "List pets\nReturns all pets"
+
+
+# --------------------------------------------------------------------------- #
+# describe_http_error
+# --------------------------------------------------------------------------- #
+class TestDescribeHttpError:
+    def test_includes_status_and_body(self):
+        resp = types.SimpleNamespace(status_code=402, reason="Payment Required",
+                                     text='{"detail": "Get an API key"}')
+        msg = describe_http_error("stories_list", resp)
+        assert "stories_list" in msg
+        assert "402 Payment Required" in msg
+        assert '{"detail": "Get an API key"}' in msg

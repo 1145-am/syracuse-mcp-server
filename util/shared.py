@@ -139,15 +139,13 @@ def operation_requires_auth(spec: Dict[str, Any], operation: Dict[str, Any]) -> 
     Per the OpenAPI spec, an operation-level ``security`` field overrides the
     top-level ``security`` field. An empty list (``security: []``) explicitly
     disables authentication for that scope. A non-empty list means at least one
-    security requirement must be satisfied.
+    security requirement must be satisfied, unless one of them is ``{}``.
     """
     op_security = operation.get("security")
-    if op_security is not None:
-        # Operation-level security overrides the global default.
-        return len(op_security) > 0
-
-    # Fall back to the global security requirements.
-    return len(spec.get("security", [])) > 0
+    # Operation-level security overrides the global default.
+    requirements = op_security if op_security is not None else spec.get("security", [])
+    # An empty requirement ({}) in the list makes auth optional.
+    return len(requirements) > 0 and all(requirements)
 
 
 def extract_tools_from_openapi(spec: Dict[str, Any]) -> Dict[str, Dict[str, Any]]:
@@ -264,5 +262,12 @@ def extract_tools_from_openapi(spec: Dict[str, Any]) -> Dict[str, Dict[str, Any]
                 tool_info["security"] = operation["security"]
             
             tools[name] = tool_info
-    
+
+    missing = [t for t in ALLOWED_TOOLS if t not in tools]
+    if missing:
+        raise ValueError(f"ALLOWED_TOOLS names not found in the OpenAPI spec: {missing}")
     return tools
+
+
+def describe_http_error(tool_name: str, resp) -> str:
+    return f"{tool_name} failed with HTTP {resp.status_code} {resp.reason}: {resp.text}"

@@ -4,7 +4,7 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent, Resource, Prompt
 import json
-from util.shared import OpenAPISpec
+from util.shared import OpenAPISpec, describe_http_error
 from util.log import logger
 from util.vars import MCP_SERVER_NAME, OPENAPI_SPEC_URL, AUTH_HEADER, API_BASE_URL
 
@@ -101,7 +101,10 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             logger.error(error_msg)
             return [TextContent(type="text", text=error_msg)]
 
-        resp.raise_for_status()
+        if not resp.ok:
+            error_msg = describe_http_error(name, resp)
+            logger.error(error_msg)
+            return [TextContent(type="text", text=error_msg)]
         
         # Return the response
         try:

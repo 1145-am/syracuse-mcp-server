@@ -20,7 +20,7 @@ import uvicorn
 from util.vars import (API_BASE_URL, API_TOKEN_PREFIX, AUTH_HEADER_NAME,
                        OPENAPI_SPEC_URL, MCP_SERVER_NAME, HTTP_MCP_SERVER_PORT,
                        MCP_SERVER_DESCRIPTION)
-from util.shared import OpenAPISpec
+from util.shared import OpenAPISpec, describe_http_error
 from util.log import logger
 
 def prepare_auth_headers(headers: Dict, extra_apikey_header_names: frozenset = frozenset()) -> Dict:
@@ -365,7 +365,10 @@ def main(
             else:
                 return [types.TextContent(type="text", text=f"Unsupported method: {tool_data['method']}")]
 
-            resp.raise_for_status()
+            if not resp.ok:
+                error_msg = describe_http_error(tool_name, resp)
+                logger.error(error_msg)
+                return [types.TextContent(type="text", text=error_msg)]
             try:
                 result_json = resp.json()
                 success_msg = f"Successfully called {tool_name}. Response: {json.dumps(result_json, indent=2)}"
