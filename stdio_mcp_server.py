@@ -2,9 +2,9 @@ import asyncio
 import requests
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent, Resource, Prompt
+from mcp.types import Tool, TextContent, Resource, Prompt, ToolAnnotations
 import json
-from util.shared import OpenAPISpec, describe_http_error
+from util.shared import OpenAPISpec, describe_http_error, tool_annotations
 from util.log import logger
 from util.vars import MCP_SERVER_NAME, OPENAPI_SPEC_URL, AUTH_HEADER, API_BASE_URL
 
@@ -26,6 +26,7 @@ async def list_tools() -> list[Tool]:
             name=tool_name,
             description=tool_info["description"],
             inputSchema=tool_info["inputSchema"],
+            annotations=ToolAnnotations(**tool_annotations(tool_info)),
             _meta={"requiresAuth": tool_info.get("requires_auth", False)},
         ))
         logger.info(f"Added {tool_name}")

@@ -396,3 +396,23 @@ class TestDescribeHttpError:
         assert "stories_list" in msg
         assert "402 Payment Required" in msg
         assert '{"detail": "Get an API key"}' in msg
+
+
+class TestToolAnnotations:
+    def test_get_is_read_only_and_idempotent(self):
+        from util.shared import tool_annotations
+        a = tool_annotations({"method": "GET", "title": "Stories"})
+        assert a == {"readOnlyHint": True, "destructiveHint": False,
+                     "idempotentHint": True, "openWorldHint": True, "title": "Stories"}
+
+    def test_post_is_not_read_only_or_idempotent(self):
+        from util.shared import tool_annotations
+        a = tool_annotations({"method": "POST"})
+        assert a["readOnlyHint"] is False
+        assert a["idempotentHint"] is False
+        assert a["destructiveHint"] is False
+        assert "title" not in a
+
+    def test_delete_is_destructive(self):
+        from util.shared import tool_annotations
+        assert tool_annotations({"method": "DELETE"})["destructiveHint"] is True

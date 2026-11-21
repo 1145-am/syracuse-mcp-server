@@ -19,7 +19,7 @@ import uvicorn
 from util.vars import (API_BASE_URL, API_TOKEN_PREFIX, AUTH_HEADER_NAME,
                        OPENAPI_SPEC_URL, MCP_SERVER_NAME, HTTP_MCP_SERVER_PORT,
                        MCP_SERVER_DESCRIPTION)
-from util.shared import OpenAPISpec
+from util.shared import OpenAPISpec, tool_annotations
 from util.x402_relay import payment_headers, tool_result
 from util.log import logger
 
@@ -326,6 +326,7 @@ def main(
                 name=tool_info["name"],
                 description=tool_info["description"],
                 inputSchema=tool_info["inputSchema"],
+                annotations=types.ToolAnnotations(**tool_annotations(tool_info)),
                 _meta={"requiresAuth": tool_info.get("requires_auth", False)},
             )
             for tool_info in openapi_spec.tools_cache.values()

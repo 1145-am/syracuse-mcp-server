@@ -252,6 +252,8 @@ def extract_tools_from_openapi(spec: Dict[str, Any]) -> Dict[str, Dict[str, Any]
                 "responses": response_info,
                 "requires_auth": operation_requires_auth(spec, operation),
             }
+            if summary:
+                tool_info["title"] = summary
 
             # Add tags if available
             if "tags" in operation:
@@ -267,6 +269,23 @@ def extract_tools_from_openapi(spec: Dict[str, Any]) -> Dict[str, Dict[str, Any]
     if missing:
         raise ValueError(f"ALLOWED_TOOLS names not found in the OpenAPI spec: {missing}")
     return tools
+
+
+def tool_annotations(tool_info: Dict[str, Any]) -> Dict[str, Any]:
+    """MCP tool annotations derived from the HTTP method: GET/HEAD calls only
+    read data, DELETE removes it, and PUT/DELETE are idempotent by HTTP
+    semantics. Every tool calls an external API, so openWorldHint is true."""
+    method = tool_info.get("method", "GET")
+    read_only = method in ("GET", "HEAD")
+    annotations = {
+        "readOnlyHint": read_only,
+        "destructiveHint": method == "DELETE",
+        "idempotentHint": read_only or method in ("PUT", "DELETE"),
+        "openWorldHint": True,
+    }
+    if tool_info.get("title"):
+        annotations["title"] = tool_info["title"]
+    return annotations
 
 
 def describe_http_error(tool_name: str, resp) -> str:

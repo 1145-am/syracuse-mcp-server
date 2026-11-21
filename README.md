@@ -46,6 +46,15 @@ Pre-req: Install `uv`
 }
 ```
 
+### To run with Docker
+
+```
+docker build -t syracuse-mcp-server .
+docker run -i --rm -e MCP_SERVER_API_TOKEN=<your key> syracuse-mcp-server
+```
+
+The image runs the stdio server against the public Syracuse API. The key is optional: you can list tools and register for a key without one.
+
 ### To connect via Syracuse's MCP Server
 
 There are no special pre-requisites
