@@ -41,6 +41,10 @@ Each story has an event type (`activity_class`), a date, the source publication 
 
 All tools carry MCP annotations (`readOnlyHint`, `idempotentHint` and so on). Each tool also carries `_meta.requiresAuth`, so a client knows which tools it can call without credentials.
 
+## How it compares
+
+We benchmark Syracuse against other news search APIs (Exa, Linkup, Perplexity and, until September 2026, Tavily) on the same company and industry queries every few weeks. An AI judge scores the results without knowing which provider is which. It scores precision, coverage, dates and publishers, story quality and trust. The method, the raw results and the full history are in [news-comparison](https://github.com/alanbuxton/news-comparison).
+
 ## Connect to the hosted server
 
 Add `https://syracuse.1145.am/mcp/` to your MCP client as a Streamable HTTP server. In Claude Code, for example:
