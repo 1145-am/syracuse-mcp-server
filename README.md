@@ -121,12 +121,12 @@ Requires [uv](https://docs.astral.sh/uv/).
 
 The server is a thin layer in front of the Syracuse REST API. At startup it reads the API's OpenAPI spec (`API_BASE_URL` + `OPENAPI_JSON`) and turns each operation into an MCP tool. Tool descriptions, parameters and auth requirements all come from that spec. Restart the server to pick up API changes.
 
-- **`ALLOWED_TOOLS`** limits the server to the four tools above by default. Remove it to expose every API operation. If a listed name isn't in the spec, the server refuses to start and names the missing tool.
+- **`ALLOWED_TOOLS`** limits the server to the four tools above by default. Set it to an empty string (`ALLOWED_TOOLS=`) to expose every API operation. If a listed name isn't in the spec, the server refuses to start and names the missing tool.
 - **`requiresAuth`** is worked out from the OpenAPI `security` rules. An operation's own `security` overrides the spec-wide one. Either `security: []` or an empty `{}` entry counts as no auth needed.
 
 ### Configuration
 
-All settings are environment variables, usually set in `.env`. See [.env.sample](.env.sample).
+All settings are environment variables, usually set in `.env`. They all have defaults that work with the public API, so `.env` is only needed to change them or to set your API key. See [.env.sample](.env.sample).
 
 | Variable | Purpose |
 |---|---|
