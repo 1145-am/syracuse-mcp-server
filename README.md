@@ -1,105 +1,119 @@
 # Syracuse Company News MCP Server
 
-An MCP server for the [Syracuse](https://syracuse.1145.am) company news API. Its tools are generated from the API's OpenAPI spec when the server starts.
+Structured company and industry news for AI agents. [Syracuse](https://syracuse.1145.am) turns news into typed, dated, source-linked events, so an agent can use them without a person first weeding out false positives. Events include M&A and investments, partnerships, senior hires and departures, product launches, new or closed locations, financial results, legal and regulatory actions, and incidents.
 
-## API Key
+Use the hosted endpoint at `https://syracuse.1145.am/mcp/`. You can pay with a free API key or per call over [x402](https://www.x402.org/), with no account.
 
-Get a free API key from syracuse.1145.am - all you need to provide is your email address. Here is a curl command to do so:
+## Tools
+
+| Tool | What it does | Needs payment? |
+|---|---|---|
+| `stories_organization_list` | News about a named company (partial match). Can be narrowed by where the company is based, its industry, and where the event happened. | Yes |
+| `stories_industry_location_list` | News for an industry and/or the location where events happened (e.g. "biotech" in "texas"). | Yes |
+| `location_groups_list` | Valid location names and ids (UN regions, US Census regions, US states, and the states or provinces of some other countries) for the location filters. | No |
+| `register_and_get_key_create` | Creates an account for an email address and returns an API key. | No |
+
+All tools carry MCP annotations (`readOnlyHint`, `idempotentHint` and so on). Each tool also carries `_meta.requiresAuth`, so a client knows which tools it can call without credentials.
+
+## Connect to the hosted server
+
+Add `https://syracuse.1145.am/mcp/` to your MCP client as a Streamable HTTP server. In Claude Code, for example:
+
+```
+claude mcp add --transport http syracuse https://syracuse.1145.am/mcp/ --header "X-API-Key: <your key>"
+```
+
+You can connect, list tools, list location groups and register for a key without credentials. To fetch stories, either send an API key or pay per call.
+
+The discovery document is at `https://syracuse.1145.am/.well-known/mcp.json`.
+
+### Option 1: API key (free)
+
+Get a key by calling the `register_and_get_key_create` tool, or with curl:
 
 ```
 curl -X POST "https://syracuse.1145.am/api/v1/register-and-get-key/" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"your_email@example.com\"}"
+  -d '{"email":"you@example.com"}'
 ```
 
-You'll get a low usage level until you confirm the key, so make sure to use an email address that you have access to.
+A key allows 30 queries a month until you click the link in the verification email, then 300 a month. Contact us (see the website footer) if you need more.
 
-## Using the MCP Server
+Send the key as `X-API-Key: <key>` or `Authorization: Bearer <key>`.
 
-There are 3 options:
+### Option 2: x402 pay-per-call (no account)
 
-1. Run as a Local MCP Server (e.g. to connect with Claude Desktop)
-2. Connect via the Syracuse MCP server
-3. Run your own Remote MCP Server locally
+If you send no API key, the stories tools take payment over [x402](https://www.x402.org/): **$0.02 in USDC per call, on Base**. You're only charged when a call returns results. Errors and empty results are free. The 402 response always has the current price and network, so check it if this page is out of date.
 
-### To run as Local MCP Server
+The server follows the x402 MCP transport:
 
-Pre-req: Install `uv` 
+1. Call a stories tool with no payment. The result has `isError: true`, and its `structuredContent` holds the x402 `PaymentRequired` object (price, network, asset, `payTo`).
+2. Sign a payment that matches one of the `accepts` entries. Repeat the call with the payment payload in the request's `_meta["x402/payment"]`.
+3. A successful result carries the settlement receipt in `_meta["x402/payment-response"]`.
 
-1. Clone this repo
-2. Copy `.env.sample` to `.env` and configure your MCP_SERVER_API_TOKEN with the API key you got above
-3. Example claude_desktop_config.json
+The server passes payments through to the Syracuse API, which verifies and settles them. Any x402-aware MCP client or agent wallet can handle these steps automatically.
 
-```
-{
-  "mcpServers": {
-    "Syracuse Company News API": {
-      "command": "/path/to/uv",
-      "args": [
-        "--directory",
-        "/path/to/repo/syracuse-mcp-server",
-        "run",
-        "stdio_mcp_server.py"
-      ]
-    }
-  }
-}
-```
+## Run it locally
 
-### To run with Docker
+You only need to run your own copy to use the stdio transport (e.g. Claude Desktop with a local process) or to work on the server. The local stdio server always uses the API key from its config, so x402 isn't available in this mode.
+
+### Docker
 
 ```
 docker build -t syracuse-mcp-server .
 docker run -i --rm -e MCP_SERVER_API_TOKEN=<your key> syracuse-mcp-server
 ```
 
-The image runs the stdio server against the public Syracuse API. The key is optional: you can list tools and register for a key without one.
+### uv
 
-### To connect via Syracuse's MCP Server
+Requires [uv](https://docs.astral.sh/uv/).
 
-There are no special pre-requisites
+1. Clone this repo.
+2. Copy `.env.sample` to `.env` and set `MCP_SERVER_API_TOKEN` to your API key.
+3. Point your client at it. Here's an example `claude_desktop_config.json`:
 
-Connect to `https://syracuse.1145.am/mcp`. You can connect, register and list location groups without a key. To fetch stories, send your key either as `Authorization: Bearer <key>` or as `X-API-Key: <key>`. A stories call made without a key returns the API's error message (see [API Key](#api-key) above to get one).
+```json
+{
+  "mcpServers": {
+    "Syracuse Company News API": {
+      "command": "/path/to/uv",
+      "args": ["--directory", "/path/to/syracuse-mcp-server", "run", "stdio_mcp_server.py"]
+    }
+  }
+}
+```
 
-MCP doc is at `https://syracuse.1145.am/.well-known/mcp.json`
+### Self-hosting the HTTP server
 
-### Running your own Remote MCP Server
+`uv run stateless_streaming_http_mcp_server.py` starts the same server as the hosted endpoint, at `http://127.0.0.1:9000/mcp` by default. It passes each caller's API key, or x402 payment, through to the API, so it doesn't need a key of its own. It also serves `/.well-known/mcp.json`.
 
-If, for some reason, you want to run your own local MCP server then that is also possible. Again, it expects `uv`.
+## How it works
 
-You don't need to update your key in the `.env` file, but you do need to: 
+The server is a thin layer in front of the Syracuse REST API. At startup it reads the API's OpenAPI spec (`API_BASE_URL` + `OPENAPI_JSON`) and turns each operation into an MCP tool. Tool descriptions, parameters and auth requirements all come from that spec. Restart the server to pick up API changes.
 
-1. Clone this repo
-2. Copy `.env.sample` to `.env` - though any further configuration is not needed
-3. Run it with `uv run stateless_streaming_http_mcp_server.py`
+- **`ALLOWED_TOOLS`** limits the server to the four tools above by default. Remove it to expose every API operation. If a listed name isn't in the spec, the server refuses to start and names the missing tool.
+- **`requiresAuth`** is worked out from the OpenAPI `security` rules. An operation's own `security` overrides the spec-wide one. Either `security: []` or an empty `{}` entry counts as no auth needed.
 
-The server reads the OpenAPI spec once at startup, so restart it to pick up API changes.
+### Configuration
 
-Connection info for MCP Inspector:
-- **Transport Type**: Streamable HTTP
-- **URL**: host:port/mcp, e.g. `http://127.0.0.1:9000/mcp`
-- Anyone making calls that require authorization will need to add their API key in the Authentication section
+All settings are environment variables, usually set in `.env`. See [.env.sample](.env.sample).
 
-The Stateless Streaming MCP Server also serves an mcp.json at `.well-known/mcp.json` (in this example it would be `http://127.0.0.1/.well-known/mcp.json` )
+| Variable | Purpose |
+|---|---|
+| `API_BASE_URL` | Base URL of the Syracuse API (`https://syracuse.1145.am`). |
+| `OPENAPI_JSON` | Path to the OpenAPI spec, relative to `API_BASE_URL`. |
+| `MCP_SERVER_API_TOKEN` | Your API key. The stdio server uses it for every call. The HTTP server only uses it to fetch the spec. |
+| `AUTH_HEADER_NAME` / `API_TOKEN_PREFIX` | How the key is sent to the API. The server rewrites `Bearer <key>` into the form the API expects (`Token <key>`). |
+| `ALLOWED_TOOLS` | Comma-separated list of tool names to expose. |
+| `HTTP_MCP_SERVER_PORT` | Port for the HTTP server (default 9000). |
+| `MCP_SERVER_NAME` / `MCP_SERVER_DESCRIPTION` | Server name and description reported to clients. |
 
-## Allowed tools
+### Tests
 
-By default the ALLOWED_TOOLS restricts the MCP server to the minimum needed to register accounts and get stories:
-- register_and_get_key_create
-- location_groups_list
-- stories_industry_location_list
-- stories_organization_list
+```
+uv run pytest
+```
 
-There's no problem to allow all tools - if you'd like to experiment simply remove ALLOWED_TOOLS from `.env`
+## License
 
-If a name in ALLOWED_TOOLS isn't in the OpenAPI spec (for example, after an endpoint is renamed), the server refuses to start and names the missing tool.
-
-## Distinguishing tools that need auth
-
-Each tool is tagged with whether it requires authentication, derived from the OpenAPI `security` rules: an operation's `security` overrides the spec-level `security`, and either an empty list (`security: []`) or an empty `{}` entry in the list (auth optional) means the tool doesn't need auth. This is exposed two ways:
-
-- In `tools/list`, each tool carries `_meta: { "requiresAuth": true | false }`.
-- In `.well-known/mcp.json`, the same `_meta` flag is present, and the `security` block is only attached to tools that actually require auth.
-
-Clients can use this to call public endpoints without prompting the user for a token, and only request credentials for tools that need them.
-
+[MIT](LICENSE)
