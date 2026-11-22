@@ -224,21 +224,6 @@ def extract_tools_from_openapi(spec: Dict[str, Any]) -> Dict[str, Dict[str, Any]
             if base_description:
                 full_description.append(base_description)
             
-            # Add parameter details to description if there are many parameters
-            if len(props) > 3:  # Only add param list for complex endpoints
-                param_descriptions = []
-                for param_name, param_info in props.items():
-                    param_desc = f"- {param_name}"
-                    if param_info.get("description"):
-                        param_desc += f": {param_info['description']}"
-                    if param_name in required_params:
-                        param_desc += " (required)"
-                    param_descriptions.append(param_desc)
-                
-                if param_descriptions:
-                    full_description.append("\nParameters:")
-                    full_description.extend(param_descriptions)
-
             tool_info = {
                 "name": name,
                 "description": "\n".join(full_description) if full_description else f"{method_upper} {path}",
