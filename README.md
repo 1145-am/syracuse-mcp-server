@@ -1,5 +1,8 @@
 # Syracuse Company News MCP Server
 
+[![Glama](https://glama.ai/mcp/servers/1145-am/syracuse-mcp-server/badges/score.svg)](https://glama.ai/mcp/servers/1145-am/syracuse-mcp-server)
+[![mcptry](https://mcptry.com/badge/io.github.1145-am/syracuse-mcp-server)](https://mcptry.com/servers/io.github.1145-am/syracuse-mcp-server)
+
 Structured company and industry news for AI agents. [Syracuse](https://syracuse.1145.am) turns news into typed, dated, source-linked events, so an agent can use them without a person first weeding out false positives. Events include M&A and investments, partnerships, senior hires and departures, product launches, new or closed locations, financial results, legal and regulatory actions, and incidents.
 
 Use the hosted endpoint at `https://syracuse.1145.am/mcp/`. You can pay with a free API key or per call over [x402](https://www.x402.org/), with no account.
