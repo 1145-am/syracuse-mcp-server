@@ -11,10 +11,12 @@ Use the hosted endpoint at `https://syracuse.1145.am/mcp/`. You can pay with a f
 
 | Tool | What it does | Needs payment? |
 |---|---|---|
-| `stories_organization_list` | News about a named company (partial match). Can be narrowed by where the company is based, its industry, and where the event happened. | Yes |
-| `stories_industry_location_list` | News for an industry and/or the location where events happened (e.g. "biotech" in "texas"). | Yes |
+| `stories_organization_list` | News about a named company (partial match). Can be narrowed by where the company is based, its industry, where the event happened, story type and recency. | Yes |
+| `stories_industry_location_list` | News for an industry and/or the location where events happened (e.g. "biotech" in "texas"). Can be narrowed by story type and recency. | Yes |
+| `stories_retrieve` | One story in full, by the `uri` from a stories result. | Yes |
 | `location_groups_list` | Valid location names and ids (UN regions, US Census regions, US states, and the states or provinces of some other countries) for the location filters. | No |
-| `register_and_get_key_create` | Creates an account for an email address and returns an API key. | No |
+| `industry_clusters_list` | Searches industry clusters and returns the ids for the `industry_id` filter. | No |
+| `api_key_create` | Creates an account for an email address and returns an API key. | No |
 
 ### Example
 
@@ -56,13 +58,13 @@ Add `https://syracuse.1145.am/mcp/` to your MCP client as a Streamable HTTP serv
 claude mcp add --transport http syracuse https://syracuse.1145.am/mcp/ --header "X-API-Key: <your key>"
 ```
 
-You can connect, list tools, list location groups and register for a key without credentials. To fetch stories, either send an API key or pay per call.
+You can connect, list tools, look up location groups and industry clusters, and register for a key without credentials. To fetch stories, either send an API key or pay per call.
 
 The discovery document is at `https://syracuse.1145.am/.well-known/mcp.json`.
 
 ### Option 1: API key (free)
 
-Get a key by calling the `register_and_get_key_create` tool, or with curl:
+Get a key by calling the `api_key_create` tool, or with curl:
 
 ```
 curl -X POST "https://syracuse.1145.am/api/v1/register-and-get-key/" \
@@ -124,7 +126,7 @@ Requires [uv](https://docs.astral.sh/uv/).
 
 The server is a thin layer in front of the Syracuse REST API. At startup it reads the API's OpenAPI spec (`API_BASE_URL` + `OPENAPI_JSON`) and turns each operation into an MCP tool. Tool descriptions, parameters and auth requirements all come from that spec. Restart the server to pick up API changes.
 
-- **`ALLOWED_TOOLS`** limits the server to the four tools above by default. Set it to an empty string (`ALLOWED_TOOLS=`) to expose every API operation. If a listed name isn't in the spec, the server refuses to start and names the missing tool.
+- **`ALLOWED_TOOLS`** limits the server to the six tools above by default. Set it to an empty string (`ALLOWED_TOOLS=`) to expose every API operation. If a listed name isn't in the spec, the server refuses to start and names the missing tool.
 - **`requiresAuth`** is worked out from the OpenAPI `security` rules. An operation's own `security` overrides the spec-wide one. Either `security: []` or an empty `{}` entry counts as no auth needed.
 
 ### Configuration

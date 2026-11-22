@@ -4,7 +4,7 @@ import os
 # --- Environment ---
 # Defaults target the public Syracuse API, so the server runs with no .env.
 # Set ALLOWED_TOOLS to an empty string to expose every API operation.
-DEFAULT_ALLOWED_TOOLS = "register_and_get_key_create,location_groups_list,stories_industry_location_list,stories_organization_list"
+DEFAULT_ALLOWED_TOOLS = "api_key_create,location_groups_list,industry_clusters_list,stories_industry_location_list,stories_organization_list,stories_retrieve"
 load_dotenv()
 API_BASE_URL = os.getenv("API_BASE_URL", "https://syracuse.1145.am")
 OPENAPI_JSON = os.getenv("OPENAPI_JSON", ".well-known/openapi.json")
