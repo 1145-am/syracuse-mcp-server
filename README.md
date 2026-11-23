@@ -5,7 +5,7 @@
 
 Structured company and industry news for AI agents. [Syracuse](https://syracuse.1145.am) turns news into typed, dated, source-linked events, so an agent can use them without a person first weeding out false positives. Events include M&A and investments, partnerships, senior hires and departures, product launches, new or closed locations, financial results, legal and regulatory actions, and incidents.
 
-Use the hosted endpoint at `https://syracuse.1145.am/mcp/`. You can pay with a free API key or per call over [x402](https://www.x402.org/), with no account.
+Use the hosted endpoint at `https://syracuse.1145.am/mcp/`. You can pay with a free API key or per call over [x402](https://www.x402.org/), with no account. Either way, the data is covered by the [Terms of Use](https://syracuse.1145.am/terms): it's for your own use, not for resale or redistribution.
 
 ## Tools
 
@@ -16,7 +16,7 @@ Use the hosted endpoint at `https://syracuse.1145.am/mcp/`. You can pay with a f
 | `stories_retrieve` | One story in full, by the `uri` from a stories result. | Yes |
 | `location_groups_list` | Valid location names and ids (UN regions, US Census regions, US states, and the states or provinces of some other countries) for the location filters. | No |
 | `industry_clusters_list` | Searches industry clusters and returns the ids for the `industry_id` filter. | No |
-| `api_key_create` | Creates an account for an email address and returns an API key. | No |
+| `api_key_create` | Creates an account for an email address and returns an API key. The user must accept the Terms of Use. | No |
 
 ### Example
 
@@ -64,12 +64,12 @@ The discovery document is at `https://syracuse.1145.am/.well-known/mcp.json`.
 
 ### Option 1: API key (free)
 
-Get a key by calling the `api_key_create` tool, or with curl:
+Get a key by calling the `api_key_create` tool, or with curl. Registering means accepting the [Terms of Use](https://syracuse.1145.am/terms), so the request must include `"accept_terms": true`:
 
 ```
 curl -X POST "https://syracuse.1145.am/api/v1/register-and-get-key/" \
   -H "Content-Type: application/json" \
-  -d '{"email":"you@example.com"}'
+  -d '{"email":"you@example.com","accept_terms":true}'
 ```
 
 A key allows 30 queries a month until you click the link in the verification email, then 300 a month. Contact us (see the website footer) if you need more.
@@ -78,7 +78,7 @@ Send the key as `X-API-Key: <key>` or `Authorization: Bearer <key>`.
 
 ### Option 2: x402 pay-per-call (no account)
 
-If you send no API key, the stories tools take payment over [x402](https://www.x402.org/): **$0.02 in USDC per call, on Base**. You're only charged when a call returns results. Errors and empty results are free. The 402 response always has the current price and network, so check it if this page is out of date.
+If you send no API key, the stories tools take payment over [x402](https://www.x402.org/): **$0.02 in USDC per call, on Base**. You're only charged when a call returns results. Errors and empty results are free. **The first 30 calls from each wallet are free**: you sign the payment as usual, and it's never settled. The 402 response always has the current price and network, so check it if this page is out of date. Paying, including with a free call, means you accept the [Terms of Use](https://syracuse.1145.am/terms).
 
 The server follows the x402 MCP transport:
 
@@ -151,4 +151,4 @@ uv run pytest
 
 ## License
 
-[MIT](LICENSE)
+The code in this repo is [MIT](LICENSE). The data the server returns comes from the Syracuse API and is covered by the [Terms of Use](https://syracuse.1145.am/terms), not by the MIT licence. Open projects can ask for the data under the [Open Database License](https://opendatacommons.org/licenses/odbl/1-0/): email info-syracuse@1145.am.

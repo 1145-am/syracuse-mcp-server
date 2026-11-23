@@ -121,6 +121,21 @@ class TestGenerateDiscoveryDocument:
         assert doc["transport"]["baseUrl"] == "http://api.test/mcp"
         assert doc["transport"]["authentication"]["required"] is False
 
+    def test_server_carries_the_api_terms_from_the_spec(self, base_env, monkeypatch):
+        monkeypatch.setattr(server, "API_TOKEN_PREFIX", "Bearer")
+        terms = "http://api.test/terms"
+        spec = {"components": {"securitySchemes": {}}, "security": [],
+                "info": {"termsOfService": terms, "license": {"name": "Terms of Use", "url": terms}}}
+        doc = server.generate_mcp_discovery_document(_spec_with_tools({}, openapi_spec=spec))
+        assert doc["server"]["termsOfService"] == terms
+        assert doc["server"]["license"] == {"name": "Terms of Use", "url": terms}
+
+    def test_server_omits_terms_the_spec_lacks(self, base_env, monkeypatch):
+        monkeypatch.setattr(server, "API_TOKEN_PREFIX", "Bearer")
+        doc = server.generate_mcp_discovery_document(_spec_with_tools({}))
+        assert "termsOfService" not in doc["server"]
+        assert "license" not in doc["server"]
+
     def test_auth_tool_advertises_security(self, base_env, monkeypatch):
         monkeypatch.setattr(server, "API_TOKEN_PREFIX", "Bearer")
         tools_cache = {

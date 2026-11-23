@@ -231,13 +231,19 @@ def generate_mcp_discovery_document(openapi_spec: OpenAPISpec) -> dict:
 
         enhanced_tools.append(tool_def)
     
+    server_info = {
+        "name": MCP_SERVER_NAME,
+        "version": openapi_spec.version,
+        "description": MCP_SERVER_DESCRIPTION,
+    }
+    spec_info = openapi_spec.openapi_spec.get("info", {})
+    for key in ("termsOfService", "license"):
+        if key in spec_info:
+            server_info[key] = spec_info[key]
+
     discovery_doc = {
         "mcpVersion": types.LATEST_PROTOCOL_VERSION,
-        "server": {
-            "name": MCP_SERVER_NAME,
-            "version": openapi_spec.version,
-            "description": MCP_SERVER_DESCRIPTION,
-        },
+        "server": server_info,
         "capabilities": {
             "tools": {
                 "listChanged": True
