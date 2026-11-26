@@ -8,6 +8,7 @@ import pytest
 from requests.structures import CaseInsensitiveDict
 
 from util.x402_relay import (
+    FREE_CALLS_REMAINING_META_KEY,
     PAYMENT_META_KEY,
     PAYMENT_RESPONSE_META_KEY,
     payment_headers,
@@ -103,6 +104,12 @@ class TestToolResult:
         assert not result.isError
         assert result.meta == {PAYMENT_RESPONSE_META_KEY: RECEIPT}
         assert '"results"' in result.content[0].text
+
+    def test_free_call_reports_calls_left_in_meta_and_text(self):
+        resp = _resp(200, body={"results": [1]}, headers={"X-Free-Calls-Remaining": "49"})
+        result = tool_result("stories_list", resp)
+        assert result.meta == {FREE_CALLS_REMAINING_META_KEY: 49}
+        assert "This call was free. Free calls left for this wallet: 49." in result.content[0].text
 
     def test_unpaid_success_has_no_meta(self):
         result = tool_result("stories_list", _resp(200, body={"results": [1]}))

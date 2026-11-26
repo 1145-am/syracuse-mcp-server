@@ -16,6 +16,8 @@ PAYMENT_RESPONSE_META_KEY = "x402/payment-response"
 PAYMENT_SIGNATURE_HEADER = "PAYMENT-SIGNATURE"
 PAYMENT_REQUIRED_HEADER = "PAYMENT-REQUIRED"
 PAYMENT_RESPONSE_HEADER = "PAYMENT-RESPONSE"
+FREE_CALLS_REMAINING_HEADER = "X-Free-Calls-Remaining"
+FREE_CALLS_REMAINING_META_KEY = "syracuse/free-calls-remaining"
 
 
 def _encode(obj) -> str:
@@ -51,12 +53,18 @@ def tool_result(tool_name: str, resp) -> types.CallToolResult:
         return types.CallToolResult(content=_text(json.dumps(payment_required)),
                                     structuredContent=payment_required, isError=True)
 
-    meta = {PAYMENT_RESPONSE_META_KEY: receipt} if receipt is not None else None
+    meta = {PAYMENT_RESPONSE_META_KEY: receipt} if receipt is not None else {}
+    free_left = resp.headers.get(FREE_CALLS_REMAINING_HEADER)
+    if free_left is not None:
+        meta[FREE_CALLS_REMAINING_META_KEY] = int(free_left)
+    meta = meta or None
     if not resp.ok:
         return types.CallToolResult(content=_text(describe_http_error(tool_name, resp)),
                                     isError=True, _meta=meta)
     try:
         text = f"Successfully called {tool_name}. Response: {json.dumps(resp.json(), indent=2)}"
+        if free_left is not None:
+            text += f"\n\nThis call was free. Free calls left for this wallet: {free_left}."
     except json.JSONDecodeError:
         text = f"Response from {tool_name}: {resp.text}"
     return types.CallToolResult(content=_text(text), _meta=meta)

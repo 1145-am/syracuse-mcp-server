@@ -78,7 +78,9 @@ Send the key as `X-API-Key: <key>` or `Authorization: Bearer <key>`.
 
 ### Option 2: x402 pay-per-call (no account)
 
-If you send no API key, the stories tools take payment over [x402](https://www.x402.org/): **$0.02 in USDC per call, on Base**. You're only charged when a call returns results. Errors and empty results are free. **The first 30 calls from each wallet are free**: you sign the payment as usual, and it's never settled. The 402 response always has the current price and network, so check it if this page is out of date. Paying, including with a free call, means you accept the [Terms of Use](https://syracuse.1145.am/terms).
+If you send no API key, the stories tools take payment over [x402](https://www.x402.org/): **$0.02 in USDC per call, on Base**. You're only charged when a call returns results. Errors and empty results are free. The 402 response always has the current price and network, so check it if this page is out of date.
+
+**Free calls, 30 November to 7 December 2026:** we're giving away 10,000 free calls, with up to 50 per wallet, until they run out. You sign the payment as usual and it's never settled. Your wallet must still hold at least one call's price in USDC on Base, because the payment is verified, but that balance is never touched. A free call's result says how many free calls your wallet has left, and carries the number in `_meta["syracuse/free-calls-remaining"]`. Details: [syracuse.1145.am/mcptry](https://syracuse.1145.am/mcptry). Paying, including with a free call, means you accept the [Terms of Use](https://syracuse.1145.am/terms).
 
 The server follows the x402 MCP transport:
 
@@ -86,7 +88,31 @@ The server follows the x402 MCP transport:
 2. Sign a payment that matches one of the `accepts` entries. Repeat the call with the payment payload in the request's `_meta["x402/payment"]`.
 3. A successful result carries the settlement receipt in `_meta["x402/payment-response"]`.
 
-The server passes payments through to the Syracuse API, which verifies and settles them. Any x402-aware MCP client or agent wallet can handle these steps automatically.
+The server passes payments through to the Syracuse API, which verifies and settles them. Any x402-aware MCP client or agent wallet can handle these steps automatically. In Python, the official `x402` SDK does it (`pip install "x402[evm,mcp]" mcp`):
+
+```python
+import asyncio
+from eth_account import Account
+from mcp import ClientSession
+from mcp.client.streamable_http import streamablehttp_client
+from x402 import x402Client
+from x402.mcp import x402MCPSession
+from x402.mechanisms.evm.exact import ExactEvmScheme
+from x402.mechanisms.evm.signers import EthAccountSigner
+
+
+async def main():
+    wallet = Account.from_key(PRIVATE_KEY)
+    payer = x402Client().register("eip155:*", ExactEvmScheme(signer=EthAccountSigner(wallet)))
+    async with streamablehttp_client("https://syracuse.1145.am/mcp/") as (read, write, _):
+        async with ClientSession(read, write) as session:
+            syracuse = x402MCPSession(session, payer)
+            await syracuse.initialize()
+            result = await syracuse.call_tool("stories_organization_list", {"org_name": "microsoft"})
+            print(result.content[0].text)
+
+asyncio.run(main())
+```
 
 ## Run it locally
 
