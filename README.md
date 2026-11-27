@@ -5,6 +5,8 @@
 
 Structured company and industry news for AI agents. [Syracuse](https://syracuse.1145.am) turns news into typed, dated, source-linked events, so an agent can use them without a person first weeding out false positives. Events include M&A and investments, partnerships, senior hires and departures, product launches, new or closed locations, financial results, legal and regulatory actions, and incidents.
 
+We do everything we can to avoid false positives: if Syracuse isn't confident a story is really about what you asked for, it leaves it out. So **a call that returns no stories is free**, whether you use an API key or pay per call.
+
 Use the hosted endpoint at `https://syracuse.1145.am/mcp/`. You can pay with a free API key or per call over [x402](https://www.x402.org/), with no account. Either way, the data is covered by the [Terms of Use](https://syracuse.1145.am/terms): it's for your own use, not for resale or redistribution.
 
 ## Tools
@@ -72,7 +74,7 @@ curl -X POST "https://syracuse.1145.am/api/v1/register-and-get-key/" \
   -d '{"email":"you@example.com","accept_terms":true}'
 ```
 
-A key allows 30 queries a month until you click the link in the verification email, then 300 a month. Contact us (see the website footer) if you need more.
+A key allows 30 queries a month until you click the link in the verification email, then 300 a month. Only calls that return stories count: empty results and errors don't use up your quota. Contact us (see the website footer) if you need more.
 
 Send the key as `X-API-Key: <key>` or `Authorization: Bearer <key>`.
 
