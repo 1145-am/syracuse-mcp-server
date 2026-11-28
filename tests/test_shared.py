@@ -1,7 +1,7 @@
 """Unit tests for the OpenAPI-spec parsing helpers in util.shared."""
 
-import types
 
+import httpx
 import pytest
 
 from util import shared
@@ -390,8 +390,7 @@ class TestExtractHeaderApiKeySchemes:
 # --------------------------------------------------------------------------- #
 class TestDescribeHttpError:
     def test_includes_status_and_body(self):
-        resp = types.SimpleNamespace(status_code=402, reason="Payment Required",
-                                     text='{"detail": "Get an API key"}')
+        resp = httpx.Response(402, text='{"detail": "Get an API key"}')
         msg = describe_http_error("stories_list", resp)
         assert "stories_list" in msg
         assert "402 Payment Required" in msg

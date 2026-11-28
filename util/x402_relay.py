@@ -71,7 +71,7 @@ def tool_result(tool_name: str, resp) -> types.CallToolResult:
                                     structuredContent=payment_required, isError=True)
 
     meta = {PAYMENT_RESPONSE_META_KEY: receipt} if receipt is not None else None
-    if not resp.ok:
+    if not resp.is_success:
         return types.CallToolResult(content=_text(describe_http_error(tool_name, resp)),
                                     isError=True, _meta=meta)
     try:

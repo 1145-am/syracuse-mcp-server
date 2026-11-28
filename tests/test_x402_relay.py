@@ -2,10 +2,9 @@
 
 import base64
 import json
-import types
 
+import httpx
 import pytest
-from requests.structures import CaseInsensitiveDict
 
 from util.x402_relay import (
     PAYMENT_META_KEY,
@@ -33,22 +32,10 @@ def _b64(obj):
     return base64.b64encode(json.dumps(obj).encode()).decode()
 
 
-def _resp(status=200, body=None, headers=None, reason="OK"):
-    text = json.dumps(body) if body is not None else ""
-
-    def _json():
-        if body is None:
-            raise json.JSONDecodeError("empty", "", 0)
-        return body
-
-    return types.SimpleNamespace(
-        status_code=status,
-        ok=status < 400,
-        reason=reason,
-        text=text,
-        headers=CaseInsensitiveDict(headers or {}),
-        json=_json,
-    )
+def _resp(status=200, body=None, headers=None, text=None):
+    if body is not None:
+        return httpx.Response(status, json=body, headers=headers)
+    return httpx.Response(status, text=text or "", headers=headers)
 
 
 class TestPaymentHeaders:
@@ -73,8 +60,7 @@ class TestPaymentHeaders:
 
 class TestToolResult:
     def test_402_with_payment_required_header_becomes_payment_required_result(self):
-        resp = _resp(402, body={}, headers={"PAYMENT-REQUIRED": _b64(PAYMENT_REQUIRED)},
-                     reason="Payment Required")
+        resp = _resp(402, body={}, headers={"PAYMENT-REQUIRED": _b64(PAYMENT_REQUIRED)})
         result = tool_result("stories_list", resp)
         assert result.isError is True
         assert result.structuredContent == PAYMENT_REQUIRED
@@ -83,21 +69,20 @@ class TestToolResult:
     def test_failed_settlement_receipt_is_carried_in_payment_required_result(self):
         failed = {"success": False, "errorReason": "insufficient_funds", "transaction": "",
                   "network": "eip155:8453"}
-        resp = _resp(402, body={}, reason="Payment Required", headers={
+        resp = _resp(402, body={}, headers={
             "PAYMENT-REQUIRED": _b64(PAYMENT_REQUIRED), "PAYMENT-RESPONSE": _b64(failed)})
         result = tool_result("stories_list", resp)
         assert result.structuredContent[PAYMENT_RESPONSE_META_KEY] == failed
 
     def test_402_without_payment_required_header_is_an_ordinary_error(self):
-        resp = _resp(402, body={"detail": "Payment settlement failed"}, reason="Payment Required")
+        resp = _resp(402, body={"detail": "Payment settlement failed"})
         result = tool_result("stories_list", resp)
         assert result.isError is True
         assert result.structuredContent is None
         assert "Payment settlement failed" in result.content[0].text
 
     def test_other_errors_include_status_and_body(self):
-        resp = _resp(400, body={"message": "Must include at least one of org_uri"},
-                     reason="Bad Request")
+        resp = _resp(400, body={"message": "Must include at least one of org_uri"})
         result = tool_result("stories_list", resp)
         assert result.isError is True
         assert "400 Bad Request" in result.content[0].text
@@ -151,8 +136,7 @@ class TestToolResult:
         assert result.meta is None
 
     def test_non_json_success_returns_text(self):
-        resp = _resp(200)
-        resp.text = "plain"
+        resp = _resp(200, text="plain")
         result = tool_result("stories_list", resp)
         assert result.content[0].text == "Response from stories_list: plain"
         assert result.structuredContent is None

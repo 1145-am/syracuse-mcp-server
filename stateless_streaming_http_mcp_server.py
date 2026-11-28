@@ -330,7 +330,7 @@ def main(
         headers = prepare_auth_headers(request_context.request.headers, extra_apikey_header_names)
         meta = request_context.meta.model_extra if request_context.meta else None
         headers |= payment_headers(meta)
-        return tools.call_tool(openapi_spec, tool_name, arguments, headers)
+        return await tools.call_tool(openapi_spec, tool_name, arguments, headers)
 
     @app.list_resource_templates()
     async def list_resource_templates() -> list[types.ResourceTemplate]:

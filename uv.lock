@@ -786,6 +786,7 @@ name = "syracuse-mcp-server"
 version = "1.4.0"
 source = { virtual = "." }
 dependencies = [
+    { name = "httpx" },
     { name = "mcp" },
     { name = "python-dotenv" },
     { name = "requests" },
@@ -798,6 +799,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "httpx" },
     { name = "mcp", specifier = ">=1.27.0,<2.0.0" },
     { name = "python-dotenv" },
     { name = "requests" },

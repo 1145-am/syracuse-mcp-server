@@ -42,7 +42,7 @@ async def call_tool(name: str, arguments: dict[str, Any]) -> CallToolResult:
     logger.info(f"Calling tool '{name}' with arguments: {arguments}")
     meta = server.request_context.meta.model_extra if server.request_context.meta else None
     headers = {"Content-Type": "application/json"} | AUTH_HEADER | payment_headers(meta)
-    return tools.call_tool(openapi_spec, name, arguments, headers)
+    return await tools.call_tool(openapi_spec, name, arguments, headers)
 
 
 async def main():

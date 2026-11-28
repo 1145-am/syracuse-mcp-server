@@ -274,4 +274,4 @@ def tool_annotations(tool_info: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def describe_http_error(tool_name: str, resp) -> str:
-    return f"{tool_name} failed with HTTP {resp.status_code} {resp.reason}: {resp.text}"
+    return f"{tool_name} failed with HTTP {resp.status_code} {resp.reason_phrase}: {resp.text}"

@@ -6,8 +6,8 @@ tool call into a backend API request, and the response into a tool result, lives
 
 from typing import Any
 
+import httpx
 import mcp.types as types
-import requests
 
 from util.log import logger
 from util.shared import tool_annotations
@@ -60,24 +60,32 @@ def build_url(tool_info: dict[str, Any], arguments: dict[str, Any]) -> tuple[str
     return API_BASE_URL.rstrip("/") + endpoint, params
 
 
-def call_tool(openapi_spec, name: str, arguments: dict[str, Any], headers: dict[str, str]) -> types.CallToolResult:
+# Tests swap this for an httpx.MockTransport.
+_transport: httpx.AsyncBaseTransport | None = None
+
+
+async def call_tool(openapi_spec, name: str, arguments: dict[str, Any], headers: dict[str, str]) -> types.CallToolResult:
     tool_info = openapi_spec.tools_cache.get(name)
     if tool_info is None:
         return error_result(f"Tool '{name}' not found. Available tools: {list(openapi_spec.tools_cache)}")
 
     url, params = build_url(tool_info, arguments)
+    params = {k: v for k, v in params.items() if v is not None}
     method = tool_info["method"].upper()
+    if method == "GET":
+        request_args = {"params": params}
+    elif method == "POST":
+        request_args = {"json": params}
+    else:
+        return error_result(f"Unsupported method: {method}")
+
     logger.info(f"Making {method} request to {url}")
     try:
-        if method == "GET":
-            resp = requests.get(url, params=params, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
-        elif method == "POST":
-            resp = requests.post(url, json=params, headers=headers, timeout=REQUEST_TIMEOUT_SECONDS)
-        else:
-            return error_result(f"Unsupported method: {method}")
-    except requests.exceptions.Timeout:
+        async with httpx.AsyncClient(timeout=REQUEST_TIMEOUT_SECONDS, transport=_transport) as client:
+            resp = await client.request(method, url, headers=headers, **request_args)
+    except httpx.TimeoutException:
         return _logged_error(f"Request to {name} timed out after {REQUEST_TIMEOUT_SECONDS} seconds")
-    except requests.exceptions.RequestException as e:
+    except httpx.HTTPError as e:
         return _logged_error(f"API request failed: {e}")
     except Exception as e:
         return _logged_error(f"Error executing tool '{name}': {e}")
