@@ -8,7 +8,6 @@ import pytest
 from requests.structures import CaseInsensitiveDict
 
 from util.x402_relay import (
-    FREE_CALLS_REMAINING_META_KEY,
     PAYMENT_META_KEY,
     PAYMENT_RESPONSE_META_KEY,
     payment_headers,
@@ -22,6 +21,11 @@ PAYMENT_REQUIRED = {
     "accepts": [{"scheme": "exact", "network": "eip155:8453", "amount": "10000"}],
 }
 RECEIPT = {"success": True, "transaction": "0xabc", "network": "eip155:8453", "payer": "0xpayer"}
+
+
+def _payment(amount, free, free_calls_remaining=None, network="eip155:8453"):
+    return {"amount": amount, "currency": "USDC", "network": network, "free": free,
+            "free_calls_remaining": free_calls_remaining}
 
 
 def _b64(obj):
@@ -105,11 +109,32 @@ class TestToolResult:
         assert result.meta == {PAYMENT_RESPONSE_META_KEY: RECEIPT}
         assert '"results"' in result.content[0].text
 
-    def test_free_call_reports_calls_left_in_meta_and_text(self):
-        resp = _resp(200, body={"results": [1]}, headers={"X-Free-Calls-Remaining": "49"})
-        result = tool_result("stories_list", resp)
-        assert result.meta == {FREE_CALLS_REMAINING_META_KEY: 49}
-        assert "This call was free. Free calls left for this wallet: 49." in result.content[0].text
+    def test_paid_call_says_what_it_cost(self):
+        body = {"results": [1], "payment": _payment("0.02", free=False)}
+        result = tool_result("stories_list", _resp(200, body=body))
+        assert result.content[0].text.endswith("\n\nThis call cost 0.02 USDC on Base.")
+
+    def test_free_call_says_how_many_free_calls_are_left(self):
+        body = {"results": [1], "payment": _payment("0", free=True, free_calls_remaining=49)}
+        result = tool_result("stories_list", _resp(200, body=body))
+        assert result.content[0].text.endswith(
+            "\n\nThis call was free. Free calls left for this wallet: 49.")
+        assert result.meta is None
+
+    def test_uncharged_call_says_it_cost_nothing(self):
+        body = {"results": [], "payment": _payment("0", free=True)}
+        result = tool_result("stories_list", _resp(200, body=body))
+        assert result.content[0].text.endswith("\n\nThis call cost nothing.")
+
+    def test_unknown_network_is_named_by_its_id(self):
+        body = {"results": [1], "payment": _payment("0.02", free=False, network="eip155:1")}
+        result = tool_result("stories_list", _resp(200, body=body))
+        assert result.content[0].text.endswith("This call cost 0.02 USDC on eip155:1.")
+
+    def test_no_payment_sentence_without_a_payment_object(self):
+        for body in ({"results": [1]}, {"results": [1], "payment": None}, [1]):
+            result = tool_result("stories_list", _resp(200, body=body))
+            assert "This call" not in result.content[0].text
 
     def test_unpaid_success_has_no_meta(self):
         result = tool_result("stories_list", _resp(200, body={"results": [1]}))

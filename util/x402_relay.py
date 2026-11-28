@@ -16,8 +16,7 @@ PAYMENT_RESPONSE_META_KEY = "x402/payment-response"
 PAYMENT_SIGNATURE_HEADER = "PAYMENT-SIGNATURE"
 PAYMENT_REQUIRED_HEADER = "PAYMENT-REQUIRED"
 PAYMENT_RESPONSE_HEADER = "PAYMENT-RESPONSE"
-FREE_CALLS_REMAINING_HEADER = "X-Free-Calls-Remaining"
-FREE_CALLS_REMAINING_META_KEY = "syracuse/free-calls-remaining"
+NETWORK_NAMES = {"eip155:8453": "Base", "eip155:84532": "Base Sepolia (testnet)"}
 
 
 def _encode(obj) -> str:
@@ -30,6 +29,19 @@ def _decode(value: str):
 
 def _text(text: str) -> list[types.ContentBlock]:
     return [types.TextContent(type="text", text=text)]
+
+
+def payment_sentence(body) -> str | None:
+    """What the call cost, from the backend's `payment` object, for the model to read."""
+    payment = body.get("payment") if isinstance(body, dict) else None
+    if not payment:
+        return None
+    if payment["free_calls_remaining"] is not None:
+        return f"This call was free. Free calls left for this wallet: {payment['free_calls_remaining']}."
+    if payment["free"]:
+        return "This call cost nothing."
+    network = NETWORK_NAMES.get(payment["network"], payment["network"])
+    return f"This call cost {payment['amount']} {payment['currency']} on {network}."
 
 
 def payment_headers(meta: dict | None) -> dict:
@@ -53,18 +65,16 @@ def tool_result(tool_name: str, resp) -> types.CallToolResult:
         return types.CallToolResult(content=_text(json.dumps(payment_required)),
                                     structuredContent=payment_required, isError=True)
 
-    meta = {PAYMENT_RESPONSE_META_KEY: receipt} if receipt is not None else {}
-    free_left = resp.headers.get(FREE_CALLS_REMAINING_HEADER)
-    if free_left is not None:
-        meta[FREE_CALLS_REMAINING_META_KEY] = int(free_left)
-    meta = meta or None
+    meta = {PAYMENT_RESPONSE_META_KEY: receipt} if receipt is not None else None
     if not resp.ok:
         return types.CallToolResult(content=_text(describe_http_error(tool_name, resp)),
                                     isError=True, _meta=meta)
     try:
-        text = f"Successfully called {tool_name}. Response: {json.dumps(resp.json(), indent=2)}"
-        if free_left is not None:
-            text += f"\n\nThis call was free. Free calls left for this wallet: {free_left}."
+        body = resp.json()
+        text = f"Successfully called {tool_name}. Response: {json.dumps(body, indent=2)}"
+        sentence = payment_sentence(body)
+        if sentence:
+            text += f"\n\n{sentence}"
     except json.JSONDecodeError:
         text = f"Response from {tool_name}: {resp.text}"
     return types.CallToolResult(content=_text(text), _meta=meta)

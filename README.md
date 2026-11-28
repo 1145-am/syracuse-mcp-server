@@ -82,18 +82,20 @@ Send the key as `X-API-Key: <key>` or `Authorization: Bearer <key>`.
 
 If you send no API key, the stories tools take payment over [x402](https://www.x402.org/): **$0.02 in USDC per call, on Base**. You're only charged when a call returns results. Errors and empty results are free. The 402 response always has the current price and network, so check it if this page is out of date.
 
-**Free calls, 30 November to 7 December 2026:** we're giving away 10,000 free calls, with up to 50 per wallet, until they run out. You sign the payment as usual and it's never settled. Your wallet must still hold at least one call's price in USDC on Base, because the payment is verified, but that balance is never touched. A free call's result says how many free calls your wallet has left, and carries the number in `_meta["syracuse/free-calls-remaining"]`. Details: [syracuse.1145.am/mcptry](https://syracuse.1145.am/mcptry). Paying, including with a free call, means you accept the [Terms of Use](https://syracuse.1145.am/terms).
+**Free calls, 30 November to 7 December 2026:** we're giving away 10,000 free calls, with up to 50 per wallet, until they run out. You sign the payment as usual and it's never settled. Your wallet must still hold at least one call's price in USDC on Base, because the payment is verified, but that balance is never touched. A free call's result says how many free calls your wallet has left. Details: [syracuse.1145.am/mcptry](https://syracuse.1145.am/mcptry). Paying, including with a free call, means you accept the [Terms of Use](https://syracuse.1145.am/terms).
 
 The server follows the x402 MCP transport:
 
 1. Call a stories tool with no payment. The result has `isError: true`, and its `structuredContent` holds the x402 `PaymentRequired` object (price, network, asset, `payTo`).
 2. Sign a payment that matches one of the `accepts` entries. Repeat the call with the payment payload in the request's `_meta["x402/payment"]`.
-3. A successful result carries the settlement receipt in `_meta["x402/payment-response"]`.
+3. A successful result carries the settlement receipt in `_meta["x402/payment-response"]`. The response also has a `payment` object saying what the call cost (`amount` in `currency` on `network`), whether it was `free`, and `free_calls_remaining` during a promotion, and the result text ends with the same in a sentence.
 
-The server passes payments through to the Syracuse API, which verifies and settles them. Any x402-aware MCP client or agent wallet can handle these steps automatically. In Python, the official `x402` SDK does it (`pip install "x402[evm,mcp]" mcp`):
+The server passes payments through to the Syracuse API, which verifies and settles them. Any x402-aware MCP client or agent wallet can handle these steps automatically. In Python, the official `x402` SDK does it (`pip install "x402[evm,mcp]" mcp`). The MCP client is async, hence `asyncio`:
 
 ```python
 import asyncio
+import os
+import sys
 from eth_account import Account
 from mcp import ClientSession
 from mcp.client.streamable_http import streamablehttp_client
@@ -103,18 +105,20 @@ from x402.mechanisms.evm.exact import ExactEvmScheme
 from x402.mechanisms.evm.signers import EthAccountSigner
 
 
-async def main():
-    wallet = Account.from_key(PRIVATE_KEY)
+async def main(org_name):
+    wallet = Account.from_key(os.environ["X402_PRIVATE_KEY"])
     payer = x402Client().register("eip155:*", ExactEvmScheme(signer=EthAccountSigner(wallet)))
     async with streamablehttp_client("https://syracuse.1145.am/mcp/") as (read, write, _):
         async with ClientSession(read, write) as session:
             syracuse = x402MCPSession(session, payer)
             await syracuse.initialize()
-            result = await syracuse.call_tool("stories_organization_list", {"org_name": "microsoft"})
+            result = await syracuse.call_tool("stories_organization_list", {"org_name": org_name})
             print(result.content[0].text)
 
-asyncio.run(main())
+asyncio.run(main(sys.argv[1] if len(sys.argv) > 1 else "microsoft"))
 ```
+
+Save it as `syracuse_x402.py` and run it with a company name, such as `python syracuse_x402.py "eli lilly"`. Use a dedicated wallet holding only a few calls' worth of USDC, and keep its key out of your code, for example in your OS keychain or an encrypted keystore.
 
 ## Run it locally
 
