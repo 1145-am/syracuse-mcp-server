@@ -246,7 +246,7 @@ def generate_mcp_discovery_document(openapi_spec: OpenAPISpec) -> dict:
         "server": server_info,
         "capabilities": {
             "tools": {
-                "listChanged": True
+                "listChanged": False
             },
             "resources": {
                 "subscribe": False,

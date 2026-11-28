@@ -9,6 +9,7 @@ out of scope for unit tests.
 import types
 
 import pytest
+from mcp.server.lowlevel.server import NotificationOptions
 
 import stateless_streaming_http_mcp_server as server
 
@@ -120,6 +121,24 @@ class TestGenerateDiscoveryDocument:
         assert doc["mcpVersion"] == server.types.LATEST_PROTOCOL_VERSION
         assert doc["transport"]["baseUrl"] == "http://api.test/mcp"
         assert doc["transport"]["authentication"]["required"] is False
+
+    def test_capabilities_match_what_the_server_reports_on_initialize(self, base_env, monkeypatch):
+        """The tool list is fixed at startup, so no list-changed notifications are sent."""
+        monkeypatch.setattr(server, "API_TOKEN_PREFIX", "Bearer")
+        doc = server.generate_mcp_discovery_document(_spec_with_tools({}))
+        app = server.Server("x")
+
+        @app.list_tools()
+        async def _tools():
+            return []
+
+        @app.list_resources()
+        async def _resources():
+            return []
+
+        reported = app.get_capabilities(NotificationOptions(), {})
+        assert doc["capabilities"]["tools"]["listChanged"] is reported.tools.listChanged is False
+        assert doc["capabilities"]["resources"]["listChanged"] is reported.resources.listChanged is False
 
     def test_server_carries_the_api_terms_from_the_spec(self, base_env, monkeypatch):
         monkeypatch.setattr(server, "API_TOKEN_PREFIX", "Bearer")
