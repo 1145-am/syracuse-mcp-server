@@ -389,12 +389,33 @@ class TestExtractHeaderApiKeySchemes:
 # describe_http_error
 # --------------------------------------------------------------------------- #
 class TestDescribeHttpError:
-    def test_includes_status_and_body(self):
-        resp = httpx.Response(402, text='{"detail": "Get an API key"}')
+    def test_uses_the_detail_message_of_a_json_body(self):
+        resp = httpx.Response(402, json={"detail": "Get an API key"})
+        assert describe_http_error("stories_list", resp) == \
+            "stories_list failed with HTTP 402 Payment Required: Get an API key"
+
+    @pytest.mark.parametrize("key", ["message", "error"])
+    def test_uses_other_message_keys(self, key):
+        resp = httpx.Response(400, json={key: "Must include org_name"})
+        assert describe_http_error("stories_list", resp).endswith(": Must include org_name")
+
+    def test_falls_back_to_the_whole_json_body(self):
+        resp = httpx.Response(400, json={"org_name": ["This field is required."]})
+        assert describe_http_error("stories_list", resp).endswith(
+            ': {"org_name": ["This field is required."]}')
+
+    def test_leaves_out_an_html_body(self):
+        resp = httpx.Response(502, html="<html><body><h1>502 Bad Gateway</h1></body></html>")
+        assert describe_http_error("stories_list", resp) == "stories_list failed with HTTP 502 Bad Gateway"
+
+    def test_cuts_long_text_bodies(self):
+        resp = httpx.Response(500, text="x" * 5000)
         msg = describe_http_error("stories_list", resp)
-        assert "stories_list" in msg
-        assert "402 Payment Required" in msg
-        assert '{"detail": "Get an API key"}' in msg
+        assert msg == "stories_list failed with HTTP 500 Internal Server Error: " + "x" * shared.MAX_ERROR_TEXT
+
+    def test_empty_body_gives_just_the_status(self):
+        resp = httpx.Response(404)
+        assert describe_http_error("stories_list", resp) == "stories_list failed with HTTP 404 Not Found"
 
 
 class TestToolAnnotations:

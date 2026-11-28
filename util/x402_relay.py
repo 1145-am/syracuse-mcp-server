@@ -9,7 +9,7 @@ import json
 
 import mcp.types as types
 
-from util.shared import describe_http_error
+from util.shared import describe_http_error, json_body
 
 PAYMENT_META_KEY = "x402/payment"
 PAYMENT_RESPONSE_META_KEY = "x402/payment-response"
@@ -72,7 +72,9 @@ def tool_result(tool_name: str, resp) -> types.CallToolResult:
 
     meta = {PAYMENT_RESPONSE_META_KEY: receipt} if receipt is not None else None
     if not resp.is_success:
+        body = json_body(resp)
         return types.CallToolResult(content=_text(describe_http_error(tool_name, resp)),
+                                    structuredContent=body if isinstance(body, dict) else None,
                                     isError=True, _meta=meta)
     try:
         body = resp.json()

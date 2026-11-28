@@ -1,3 +1,4 @@
+import json
 from typing import Dict, Any
 import requests
 from util.vars import OPENAPI_SPEC_URL, AUTH_HEADER, ALLOWED_TOOLS
@@ -273,5 +274,38 @@ def tool_annotations(tool_info: Dict[str, Any]) -> Dict[str, Any]:
     return annotations
 
 
+MAX_ERROR_TEXT = 1000
+
+
+def json_body(resp):
+    """The response's JSON body, or None if it has none."""
+    try:
+        return resp.json()
+    except ValueError:
+        return None
+
+
 def describe_http_error(tool_name: str, resp) -> str:
-    return f"{tool_name} failed with HTTP {resp.status_code} {resp.reason_phrase}: {resp.text}"
+    """One line for the model: the status, then the API's own error message.
+
+    For a JSON body the message is its `detail`, `message` or `error` string when it
+    has one (DRF and the API's own errors), else the whole body. An HTML body, such
+    as a proxy's 502 page, is left out; other text is cut to MAX_ERROR_TEXT characters.
+    """
+    status = f"{tool_name} failed with HTTP {resp.status_code} {resp.reason_phrase}"
+    body = json_body(resp)
+    if body is not None:
+        message = _error_message(body)
+    elif "html" in resp.headers.get("content-type", ""):
+        message = ""
+    else:
+        message = resp.text.strip()[:MAX_ERROR_TEXT]
+    return f"{status}: {message}" if message else status
+
+
+def _error_message(body) -> str:
+    if isinstance(body, dict):
+        for key in ("detail", "message", "error"):
+            if isinstance(body.get(key), str):
+                return body[key]
+    return json.dumps(body)

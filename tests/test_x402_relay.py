@@ -78,8 +78,9 @@ class TestToolResult:
         resp = _resp(402, body={"detail": "Payment settlement failed"})
         result = tool_result("stories_list", resp)
         assert result.isError is True
-        assert result.structuredContent is None
-        assert "Payment settlement failed" in result.content[0].text
+        assert result.structuredContent == {"detail": "Payment settlement failed"}
+        assert result.content[0].text == \
+            "stories_list failed with HTTP 402 Payment Required: Payment settlement failed"
 
     def test_other_errors_include_status_and_body(self):
         resp = _resp(400, body={"message": "Must include at least one of org_uri"})
@@ -87,6 +88,13 @@ class TestToolResult:
         assert result.isError is True
         assert "400 Bad Request" in result.content[0].text
         assert "Must include at least one of org_uri" in result.content[0].text
+        assert result.structuredContent == {"message": "Must include at least one of org_uri"}
+
+    def test_errors_without_a_json_object_body_have_no_structured_content(self):
+        for resp in (_resp(500, text="oops"), _resp(400, body=["bad"])):
+            result = tool_result("stories_list", resp)
+            assert result.isError is True
+            assert result.structuredContent is None
 
     def test_paid_success_carries_receipt_in_meta(self):
         resp = _resp(200, body={"results": [1]}, headers={"PAYMENT-RESPONSE": _b64(RECEIPT)})
