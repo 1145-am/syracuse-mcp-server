@@ -13,14 +13,14 @@ from starlette.routing import Mount, Route
 from starlette.responses import JSONResponse
 from starlette.types import Receive, Scope, Send
 from starlette.requests import Request
-import requests 
 import uvicorn
 
 from util.vars import (API_BASE_URL, API_TOKEN_PREFIX, AUTH_HEADER_NAME,
                        OPENAPI_SPEC_URL, MCP_SERVER_NAME, HTTP_MCP_SERVER_PORT,
                        MCP_SERVER_DESCRIPTION)
-from util.shared import OpenAPISpec, tool_annotations
-from util.x402_relay import error_result, payment_headers, tool_result
+from util import tools
+from util.shared import OpenAPISpec
+from util.x402_relay import payment_headers
 from util.log import logger
 
 def prepare_auth_headers(headers: Dict, extra_apikey_header_names: frozenset = frozenset()) -> Dict:
@@ -309,51 +309,18 @@ def main(
 
     @app.list_resources()
     async def list_resources() -> list[types.Resource]:
-        return [
-            types.Resource(
-                uri=OPENAPI_SPEC_URL,
-                name="API Schema",
-                description="OpenAPI specification for available endpoints",
-                mimeType="application/json"
-        )
-    ]
+        return tools.list_resources()
 
     @app.read_resource()
     async def read_resource(uri: str) -> str:
-        logger.info(f"Reading resource: {uri}")
-        if str(uri) == OPENAPI_SPEC_URL:
-            return openapi_spec.raw_openapi_spec
-        raise ValueError(f"Unknown resource URI: {uri}")
-    
+        return tools.read_resource(openapi_spec, uri)
+
     @app.list_tools()
     async def list_tools() -> list[types.Tool]:
-        return [
-            types.Tool(
-                name=tool_info["name"],
-                description=tool_info["description"],
-                inputSchema=tool_info["inputSchema"],
-                annotations=types.ToolAnnotations(**tool_annotations(tool_info)),
-                _meta={"requiresAuth": tool_info.get("requires_auth", False)},
-            )
-            for tool_info in openapi_spec.tools_cache.values()
-        ]
+        return tools.list_tools(openapi_spec)
 
     @app.call_tool()
     async def call_tool(tool_name: str, arguments: dict[str, Any]) -> types.CallToolResult:
-        tool_data = openapi_spec.tools_cache[tool_name]
-
-        endpoint = tool_data["endpoint"]
-        params = arguments.copy()
-
-        # Replace path params in URL (e.g. {id})
-        for key, value in list(params.items()):
-            placeholder = "{" + key + "}"
-            if placeholder in endpoint:
-                endpoint = endpoint.replace(placeholder, str(value))
-                del params[key]
-
-        url = API_BASE_URL.rstrip("/") + endpoint
-
         request_context = app.request_context
         extra_apikey_header_names = frozenset(
             s.get("name", "")
@@ -361,37 +328,10 @@ def main(
             if s.get("name", "").lower() != AUTH_HEADER_NAME.lower()
         )
         headers = prepare_auth_headers(request_context.request.headers, extra_apikey_header_names)
+        meta = request_context.meta.model_extra if request_context.meta else None
+        headers |= payment_headers(meta)
+        return tools.call_tool(openapi_spec, tool_name, arguments, headers)
 
-        logger.info(f"Making {tool_data['method']} request to {url}")
-
-        try:
-            meta = request_context.meta.model_extra if request_context.meta else None
-            headers |= payment_headers(meta)
-            if tool_data["method"].upper() == "GET":
-                resp = requests.get(url, params=params, headers=headers, timeout=30)
-            elif tool_data["method"].upper() == "POST":
-                resp = requests.post(url, json=params, headers=headers, timeout=30)
-            else:
-                return error_result(f"Unsupported method: {tool_data['method']}")
-
-            result = tool_result(tool_name, resp)
-            logger.info(f"Tool '{tool_name}' returned HTTP {resp.status_code}")
-            return result
-
-        except requests.exceptions.Timeout:
-            error_msg = f"Request to {tool_name} timed out after 30 seconds"
-            logger.error(error_msg)
-            return error_result(error_msg)
-        except requests.exceptions.RequestException as e:
-            error_msg = f"API request failed: {str(e)}"
-            logger.error(error_msg)
-            return error_result(error_msg)
-        except Exception as e:
-            error_msg = f"Error executing tool '{tool_name}': {str(e)}"
-            logger.error(error_msg)
-            return error_result(error_msg)
-
-    
     @app.list_resource_templates()
     async def list_resource_templates() -> list[types.ResourceTemplate]:
         return []
