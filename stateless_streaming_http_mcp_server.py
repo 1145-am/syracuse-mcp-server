@@ -301,10 +301,8 @@ async def well_known_mcp_handler(request: Request) -> JSONResponse:
     discovery_doc = generate_mcp_discovery_document(openapi_spec)
     return JSONResponse(content=discovery_doc)
 
-def main(
-    openapi_spec: OpenAPISpec,
-    port: int
-) -> int:
+def build_app(openapi_spec: OpenAPISpec) -> CORSMiddleware:
+    """The ASGI app: the MCP endpoint at /mcp and the discovery document."""
     app = Server(MCP_SERVER_NAME, version=openapi_spec.version)
 
     @app.list_resources()
@@ -362,8 +360,9 @@ def main(
                 logger.info("Application shutting down...")
 
     # Create an ASGI application using the transport
+    # debug stays off: in debug mode Starlette sends full tracebacks to callers.
     starlette_app = Starlette(
-        debug=True,
+        debug=False,
         routes=[
             Route("/.well-known/mcp.json", well_known_mcp_handler, methods=["GET"]),
             Mount("/mcp", app=handle_streamable_http),
@@ -382,9 +381,11 @@ def main(
         allow_methods=["GET", "POST", "DELETE"],  # MCP streamable HTTP methods
         expose_headers=["Mcp-Session-Id"],
     )
+    return starlette_app
 
-    uvicorn.run(starlette_app, host="127.0.0.1", port=port)
 
+def main(openapi_spec: OpenAPISpec, port: int) -> int:
+    uvicorn.run(build_app(openapi_spec), host="127.0.0.1", port=port)
     return 0
 
 if __name__ == '__main__':

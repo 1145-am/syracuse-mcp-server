@@ -9,6 +9,7 @@ out of scope for unit tests.
 import types
 
 import pytest
+from starlette.testclient import TestClient
 from mcp.server.lowlevel.server import NotificationOptions
 
 import stateless_streaming_http_mcp_server as server
@@ -393,3 +394,26 @@ class TestPrepareAuthHeadersExtraHeaders:
         assert result["Authorization"] == "Bearer tok"
         assert result["Cookie"] == "s=1"
         assert result["X-API-Key"] == "k"
+
+
+# --------------------------------------------------------------------------- #
+# build_app
+# --------------------------------------------------------------------------- #
+class TestBuildApp:
+    def test_serves_the_discovery_document(self, base_env, monkeypatch):
+        monkeypatch.setattr(server, "API_TOKEN_PREFIX", "Bearer")
+        client = TestClient(server.build_app(_spec_with_tools({})))
+        resp = client.get("/.well-known/mcp.json")
+        assert resp.status_code == 200
+        assert resp.json()["server"]["name"] == "Test Server"
+
+    def test_server_errors_do_not_expose_tracebacks(self, base_env, monkeypatch):
+        def broken(_spec):
+            raise RuntimeError("secret internal detail")
+
+        monkeypatch.setattr(server, "generate_mcp_discovery_document", broken)
+        client = TestClient(server.build_app(_spec_with_tools({})), raise_server_exceptions=False)
+        resp = client.get("/.well-known/mcp.json")
+        assert resp.status_code == 500
+        assert "secret internal detail" not in resp.text
+        assert "Traceback" not in resp.text
