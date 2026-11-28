@@ -71,6 +71,15 @@ class TestListTools:
         assert listed[0].annotations.readOnlyHint is True
         assert listed[1].annotations.readOnlyHint is False
 
+    def test_title_is_on_the_tool_and_in_annotations(self):
+        [tool] = tools.list_tools(_spec(STORIES_LIST))
+        assert tool.title == "List stories"
+        assert tool.annotations.title == "List stories"
+
+    def test_tool_without_a_summary_has_no_title(self):
+        [tool] = tools.list_tools(_spec(KEY_CREATE))
+        assert tool.title is None
+
     def test_carries_requires_auth_in_meta(self):
         listed = tools.list_tools(_spec(STORIES_LIST, KEY_CREATE))
         assert [t.meta for t in listed] == [{"requiresAuth": True}, {"requiresAuth": False}]

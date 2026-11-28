@@ -22,6 +22,7 @@ def list_tools(openapi_spec) -> list[types.Tool]:
     return [
         types.Tool(
             name=tool_info["name"],
+            title=tool_info.get("title"),
             description=tool_info["description"],
             inputSchema=tool_info["inputSchema"],
             annotations=types.ToolAnnotations(**tool_annotations(tool_info)),
