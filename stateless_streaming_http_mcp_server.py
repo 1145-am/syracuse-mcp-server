@@ -20,7 +20,7 @@ from util.vars import (API_BASE_URL, API_TOKEN_PREFIX, AUTH_HEADER_NAME,
                        OPENAPI_SPEC_URL, MCP_SERVER_NAME, HTTP_MCP_SERVER_PORT,
                        MCP_SERVER_DESCRIPTION)
 from util.shared import OpenAPISpec, tool_annotations
-from util.x402_relay import payment_headers, tool_result
+from util.x402_relay import error_result, payment_headers, tool_result
 from util.log import logger
 
 def prepare_auth_headers(headers: Dict, extra_apikey_header_names: frozenset = frozenset()) -> Dict:
@@ -339,7 +339,7 @@ def main(
         ]
 
     @app.call_tool()
-    async def call_tool(tool_name: str, arguments: dict[str, Any]) -> list[types.ContentBlock] | types.CallToolResult:
+    async def call_tool(tool_name: str, arguments: dict[str, Any]) -> types.CallToolResult:
         tool_data = openapi_spec.tools_cache[tool_name]
 
         endpoint = tool_data["endpoint"]
@@ -372,7 +372,7 @@ def main(
             elif tool_data["method"].upper() == "POST":
                 resp = requests.post(url, json=params, headers=headers, timeout=30)
             else:
-                return [types.TextContent(type="text", text=f"Unsupported method: {tool_data['method']}")]
+                return error_result(f"Unsupported method: {tool_data['method']}")
 
             result = tool_result(tool_name, resp)
             logger.info(f"Tool '{tool_name}' returned HTTP {resp.status_code}")
@@ -381,15 +381,15 @@ def main(
         except requests.exceptions.Timeout:
             error_msg = f"Request to {tool_name} timed out after 30 seconds"
             logger.error(error_msg)
-            return [types.TextContent(type="text", text=error_msg)]
+            return error_result(error_msg)
         except requests.exceptions.RequestException as e:
             error_msg = f"API request failed: {str(e)}"
             logger.error(error_msg)
-            return [types.TextContent(type="text", text=error_msg)]
+            return error_result(error_msg)
         except Exception as e:
             error_msg = f"Error executing tool '{tool_name}': {str(e)}"
             logger.error(error_msg)
-            return [types.TextContent(type="text", text=error_msg)]    
+            return error_result(error_msg)
 
     
     @app.list_resource_templates()

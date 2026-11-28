@@ -31,6 +31,11 @@ def _text(text: str) -> list[types.ContentBlock]:
     return [types.TextContent(type="text", text=text)]
 
 
+def error_result(text: str) -> types.CallToolResult:
+    """A failed tool result, flagged with isError so clients can tell it from data."""
+    return types.CallToolResult(content=_text(text), isError=True)
+
+
 def payment_sentence(body) -> str | None:
     """What the call cost, from the backend's `payment` object, for the model to read."""
     payment = body.get("payment") if isinstance(body, dict) else None
@@ -71,10 +76,21 @@ def tool_result(tool_name: str, resp) -> types.CallToolResult:
                                     isError=True, _meta=meta)
     try:
         body = resp.json()
-        text = f"Successfully called {tool_name}. Response: {json.dumps(body, indent=2)}"
-        sentence = payment_sentence(body)
-        if sentence:
-            text += f"\n\n{sentence}"
     except json.JSONDecodeError:
-        text = f"Response from {tool_name}: {resp.text}"
-    return types.CallToolResult(content=_text(text), _meta=meta)
+        return types.CallToolResult(content=_text(f"Response from {tool_name}: {resp.text}"), _meta=meta)
+    return json_result(body, meta)
+
+
+def json_result(body, meta: dict | None = None) -> types.CallToolResult:
+    """A successful tool result for a JSON response body.
+
+    The body goes in `structuredContent` (when it is an object, as the spec requires)
+    and, serialized, in the first text block for clients that only read text. What the
+    call cost goes in a second text block so the first stays exactly the JSON.
+    """
+    content = _text(json.dumps(body, indent=2))
+    sentence = payment_sentence(body)
+    if sentence:
+        content += _text(sentence)
+    structured = body if isinstance(body, dict) else None
+    return types.CallToolResult(content=content, structuredContent=structured, _meta=meta)

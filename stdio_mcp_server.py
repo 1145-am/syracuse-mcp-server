@@ -2,10 +2,11 @@ import asyncio
 import requests
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
-from mcp.types import Tool, TextContent, Resource, Prompt, ToolAnnotations
+from mcp.types import Tool, TextContent, Resource, Prompt, ToolAnnotations, CallToolResult
 import json
 from util.shared import OpenAPISpec, describe_http_error, tool_annotations
 from util.log import logger
+from util.x402_relay import error_result, json_result
 from util.vars import MCP_SERVER_NAME, OPENAPI_SPEC_URL, AUTH_HEADER, API_BASE_URL
 
 
@@ -66,7 +67,7 @@ async def read_resource(uri: str) -> str:
         raise ValueError(error_msg)
 
 @server.call_tool()
-async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+async def call_tool(name: str, arguments: dict) -> list[TextContent] | CallToolResult:
     """Execute a tool call"""
     logger.info(f"Calling tool '{name}' with arguments: {arguments}")
     
@@ -74,7 +75,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     if not tool:
         error_msg = f"Tool '{name}' not found. Available tools: {list(openapi_spec.tools_cache.keys())}"
         logger.error(error_msg)
-        return [TextContent(type="text", text=error_msg)]
+        return error_result(error_msg)
 
     try:
         endpoint = tool["endpoint"]
@@ -100,19 +101,18 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         else:
             error_msg = f"Unsupported method: {tool['method']}"
             logger.error(error_msg)
-            return [TextContent(type="text", text=error_msg)]
+            return error_result(error_msg)
 
         if not resp.ok:
             error_msg = describe_http_error(name, resp)
             logger.error(error_msg)
-            return [TextContent(type="text", text=error_msg)]
+            return error_result(error_msg)
         
         # Return the response
         try:
             result = resp.json()
-            success_msg = f"Successfully called {name}. Response: {json.dumps(result, indent=2)}"
             logger.info(f"Tool '{name}' executed successfully")
-            return [TextContent(type="text", text=success_msg)]
+            return json_result(result)
         except json.JSONDecodeError:
             logger.info(f"Tool '{name}' returned non-JSON response")
             return [TextContent(type="text", text=f"Response from {name}: {resp.text}")]
@@ -120,15 +120,15 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     except requests.exceptions.Timeout:
         error_msg = f"Request to {name} timed out after 30 seconds"
         logger.error(error_msg)
-        return [TextContent(type="text", text=error_msg)]
+        return error_result(error_msg)
     except requests.exceptions.RequestException as e:
         error_msg = f"API request failed: {str(e)}"
         logger.error(error_msg)
-        return [TextContent(type="text", text=error_msg)]
+        return error_result(error_msg)
     except Exception as e:
         error_msg = f"Error executing tool '{name}': {str(e)}"
         logger.error(error_msg)
-        return [TextContent(type="text", text=error_msg)]
+        return error_result(error_msg)
 
 async def main():
     """Main entry point"""
