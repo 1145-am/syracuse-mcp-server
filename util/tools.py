@@ -5,6 +5,7 @@ tool call into a backend API request, and the response into a tool result, lives
 """
 
 from typing import Any
+from urllib.parse import quote
 
 import httpx
 import mcp.types as types
@@ -49,13 +50,19 @@ def read_resource(openapi_spec, uri) -> str:
 
 
 def build_url(tool_info: dict[str, Any], arguments: dict[str, Any]) -> tuple[str, dict[str, Any]]:
-    """The request URL, with path parameters filled in, and the remaining arguments."""
+    """The request URL, with path parameters filled in, and the remaining arguments.
+
+    Path values are percent-encoded so `?`, `#`, `%` and spaces can't end the path
+    early or change its meaning. `/` and `:` are kept: stories_retrieve takes a whole
+    story URI as its path (`/api/v1/stories/https://1145.am/db/...`), which the
+    backend's `<path:uri>` route reads with its slashes intact.
+    """
     endpoint = tool_info["endpoint"]
     params = dict(arguments)
     for key, value in list(params.items()):
         placeholder = "{" + key + "}"
         if placeholder in endpoint:
-            endpoint = endpoint.replace(placeholder, str(value))
+            endpoint = endpoint.replace(placeholder, quote(str(value), safe="/:"))
             del params[key]
     return API_BASE_URL.rstrip("/") + endpoint, params
 

@@ -95,6 +95,28 @@ class TestBuildUrl:
         assert url == f"{API_BASE_URL}/api/v1/stories/abc/"
         assert params == {"output": "full"}
 
+    def test_keeps_slashes_and_colons_in_a_story_uri(self):
+        uri = "https://1145.am/db/23884581/Agentic_Momentum_In_Q2"
+        url, _ = tools.build_url(STORY_RETRIEVE, {"id": uri})
+        assert url == f"{API_BASE_URL}/api/v1/stories/{uri}/"
+
+    @pytest.mark.parametrize("value, encoded", [
+        ("a?b", "a%3Fb"),
+        ("a#b", "a%23b"),
+        ("a b", "a%20b"),
+        ("100%", "100%25"),
+        ("a&b=c", "a%26b%3Dc"),
+    ])
+    def test_encodes_characters_that_would_change_the_url(self, value, encoded):
+        url, _ = tools.build_url(STORY_RETRIEVE, {"id": value})
+        assert url == f"{API_BASE_URL}/api/v1/stories/{encoded}/"
+
+    def test_encoded_path_reaches_the_api_intact(self, http):
+        _call(_spec(STORY_RETRIEVE), "stories_retrieve", {"id": "https://1145.am/db/1/x?y"})
+        [request] = http.requests
+        assert request.url.path == "/api/v1/stories/https://1145.am/db/1/x?y/"
+        assert request.url.query == b""
+
     def test_does_not_change_the_callers_arguments(self):
         arguments = {"id": "abc"}
         tools.build_url(STORY_RETRIEVE, arguments)
